@@ -9,9 +9,11 @@ from email.mime.text import MIMEText
 # Sabitler
 DOSYA = "onceki_duyurular.txt"
 BASE_URL = "https://www.diaakademi.com/gelistirme-duyurulari/?_page="
-GONDEREN = "basari.printer@gmail.com"
-ALICI = "muhammed@basari.com.tr"
-SIFRE = "gtrpbahxdvixyqdq"
+GONDEREN = "eposta" #gönderen eposta
+SIFRE = "sıfre" #gonderen eposta sifre
+ALICI = "eposta" #alıcı eposta
+
+
 
 def email_gonder(yeni_duyurular):
     # HTML formatında e-posta içeriği
@@ -20,27 +22,29 @@ def email_gonder(yeni_duyurular):
     <table border="1" cellspacing="0" cellpadding="5">
         <tr>
             <th>Konu</th>
+            <th>Açıklama</th>
             <th>Tarih</th>
             <th>Kategoriler</th>
             <th>Versiyon</th>
         </tr>
     """
-    
-    for baslik, tarih, href, kategoriler, etiketler in yeni_duyurular:
+
+    for baslik, aciklama, tarih, href, kategoriler, etiketler in yeni_duyurular:
         kategoriler = [kat for kat in kategoriler if kat != "Geliştirme Duyuruları"]
         kategori_str = ", ".join(kategoriler) if kategoriler else "-"
         etiket_str = ", ".join(etiketler) if etiketler else "-"
         html_content += f"""
         <tr>
             <td><a href="{href}">{baslik}</a></td>
+            <td>{aciklama}</td>
             <td>{tarih}</td>
             <td>{kategori_str}</td>
             <td>{etiket_str}</td>
         </tr>
         """
-    
+
     html_content += "</table>"
-    
+
     mesaj = MIMEText(html_content, "html")
     mesaj["Subject"] = "DİA ERP Yeni Duyurular"
     mesaj["From"] = GONDEREN
@@ -54,6 +58,7 @@ def email_gonder(yeni_duyurular):
             print("E-posta gönderildi!")
     except Exception as e:
         print(f"E-posta gönderimi başarısız: {e}")
+
 
 def kontrol_et():
     # Önceki duyuruları oku
@@ -83,7 +88,7 @@ def kontrol_et():
             if link:
                 baslik = link.text.strip()
                 href = link.get("href")
-                
+
                 parent = link.find_parent()
                 tarih_span = parent.find("span", class_="entry-date") if parent else None
                 if not tarih_span:
@@ -92,7 +97,13 @@ def kontrol_et():
                             tarih_span = span
                             break
                 tarih = tarih_span.find("time").text.strip() if tarih_span else "Tarih bulunamadı"
-                
+
+                # Açıklama çekme
+                aciklama_div = parent.find_next("div", class_="pt-cv-content") if parent else None
+                aciklama = aciklama_div.text.strip() if aciklama_div else "Açıklama bulunamadı"
+                if aciklama_div and aciklama_div.find("a", class_="pt-cv-readmore"):
+                    aciklama = aciklama.replace(aciklama_div.find("a", class_="pt-cv-readmore").text.strip(), "").strip()
+
                 # Kategori ve etiket bilgilerini çek
                 terms_span = parent.find_next("span", class_="terms") if parent else None
                 if not terms_span:
@@ -100,19 +111,19 @@ def kontrol_et():
                 kategori_ve_etiketler = terms_span.find_all("a") if terms_span else []
                 kategoriler = [a.text.strip() for a in kategori_ve_etiketler if "kategori" in a["href"]]
                 etiketler = [a.text.strip() for a in kategori_ve_etiketler if "tag" in a["href"]]
-                
+
                 duyuru_id = f"{baslik} - {tarih}"
                 if baslik and duyuru_id not in onceki_duyurular:
-                    yeni_duyurular.append((baslik, tarih, href, kategoriler, etiketler))
+                    yeni_duyurular.append((baslik, aciklama, tarih, href, kategoriler, etiketler))
                     onceki_duyurular.add(duyuru_id)
 
     if yeni_duyurular:
         print("Yeni Duyurular:")
-        for baslik, tarih, href, kategoriler, etiketler in yeni_duyurular:
+        for baslik, aciklama, tarih, href, kategoriler, etiketler in yeni_duyurular:
             kategoriler = [kat for kat in kategoriler if kat != "Geliştirme Duyuruları"]
             kategori_str = ", ".join(kategoriler) if kategoriler else "-"
             etiket_str = ", ".join(etiketler) if etiketler else "-"
-            print(f"{baslik} ({tarih}) - Kategoriler: {kategori_str}, Versiyon: {etiket_str} - Link: {href}")
+            print(f"{baslik} ({tarih}) - Açıklama: {aciklama} - Kategoriler: {kategori_str}, Versiyon: {etiket_str} - Link: {href}")
         email_gonder(yeni_duyurular)
     else:
         print("Yeni duyuru yok.")
@@ -120,6 +131,7 @@ def kontrol_et():
     with open(DOSYA, "w", encoding="utf-8") as f:
         for duyuru in onceki_duyurular:
             f.write(duyuru + "\n")
+
 
 kontrol_et()
 
